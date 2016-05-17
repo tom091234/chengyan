@@ -19,12 +19,15 @@ HWND hwndTreeContent;                   // 变量树结构控件句柄
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    SubProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 HTREEITEM insertTree(HWND hTree, HTREEITEM hRoot, LPCTSTR name, bool children, LPARAM lParam);
 HTREEITEM AddItemToTree(HWND hwndTV, HTREEITEM hParent, LPWSTR lpszItem, int nLevel);
 int BuildTree(HWND hwndTV, tTree *tree);
 int AddChildren(HWND hwndTV, HTREEITEM hParent, tNode **NodeLoop);
 void FindFiles(TCHAR *folderPath, DWORD level);
+BOOL AddItemToList(HWND hWndListView, int index);
+BOOL AddColumnToList(HWND hWndListView, int index);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -88,8 +91,15 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_CHENGYAN);
     wcex.lpszClassName  = szWindowClass;
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
-    return RegisterClassExW(&wcex);
+    RegisterClassEx(&wcex);
+    
+    wcex.lpfnWndProc = SubProc;
+    wcex.hIcon = NULL;
+    wcex.hCursor = NULL;
+    wcex.lpszMenuName = NULL;
+    wcex.lpszClassName = TEXT("subwindow");
+    wcex.hIconSm = NULL;
+    return RegisterClassEx(&wcex);
 }
 
 //
@@ -106,8 +116,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 将实例句柄存储在全局变量中
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+   HWND hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+      CW_USEDEFAULT, 0, 1016, 658, nullptr, nullptr, hInstance, nullptr);
 
    if (!hWnd)
    {
@@ -135,6 +145,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     switch (message)
     {
         RECT rt;
+        HWND tmp;
+        int loop;
 
     case WM_CREATE:
         FindFiles(docRoot, 0);
@@ -142,8 +154,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
         hwndTreeContent = CreateWindowEx(0, WC_TREEVIEW, NULL,
             WS_CHILD | WS_VISIBLE | WS_BORDER | TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT,
-            0, 0, rt.right, rt.bottom, hWnd, NULL, hInst, (LPVOID)NULL);
+            0, 0, 350, rt.bottom, hWnd, NULL, hInst, (LPVOID)NULL);
         BuildTree(hwndTreeContent, pTree);
+        tmp = CreateWindow(WC_LISTVIEW, TEXT("文档模板列表"), WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT,
+            350, 0, rt.right-350, rt.bottom-100, hWnd, NULL, hInst, 0);
+        ListView_SetExtendedListViewStyle(tmp, LVS_EX_CHECKBOXES);
+        AddColumnToList(tmp, 0);
+        for (loop = 0; loop < 10; loop++)
+        {
+            AddItemToList(tmp, loop);
+        }
+
+        tmp = CreateWindow(TEXT("BUTTON"), TEXT("全选"), WS_TABSTOP | WS_VISIBLE | WS_CHILD,
+            450, rt.bottom - 60, 60, 30, hWnd, NULL, hInst, 0);
+        tmp = CreateWindow(TEXT("BUTTON"), TEXT("下载"), WS_TABSTOP | WS_VISIBLE | WS_CHILD,
+            rt.right - 150, rt.bottom - 60, 60, 30, hWnd, NULL, hInst, 0);
+
         break;
     case WM_COMMAND:
         {
@@ -178,6 +204,74 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return 0;
 }
+
+//
+//  函数: SubProc(HWND, UINT, WPARAM, LPARAM)
+//
+//  目的:    处理子窗口的消息。
+//
+//  WM_COMMAND  - 处理应用程序菜单
+//  WM_PAINT    - 绘制主窗口
+//  WM_DESTROY  - 发送退出消息并返回
+//
+//
+LRESULT CALLBACK SubProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+        HWND tmp;                   // 变量树结构控件句柄
+        RECT rt;
+        int loop;
+        int x ,y;
+
+    case WM_CREATE:
+        GetClientRect(hWnd, &rt);
+        x = 10;
+        y = 10;
+        for (loop = 0; loop < 100; loop ++)
+        {
+            TCHAR str[100];
+            _stprintf_s(str, 100, TEXT("%d"), loop);
+            tmp = CreateWindow(TEXT("BUTTON"), str, WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                x, y, 400, 20, hWnd, NULL, hInst, NULL);
+
+            y += 25;
+        }
+        break;
+    case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam);
+        // 分析菜单选择: 
+        switch (wmId)
+        {
+            break;
+        case IDM_EXIT:
+            DestroyWindow(hWnd);
+            break;
+        default:
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
+    }
+    break;
+    case WM_VSCROLL:
+        break;
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+        // TODO: 在此处添加使用 hdc 的任何绘图代码...
+        EndPaint(hWnd, &ps);
+    }
+    break;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
 
 // “关于”框的消息处理程序。
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
@@ -388,14 +482,18 @@ void FindFiles(TCHAR *folderPath, DWORD level)
             }
             else
             {
-                tNode *pNode = GetNewNode();
-                pNode->dwLevel = level;
-                pNode->dwAttr = FindFileData.dwFileAttributes;
-                _tcscpy_s(pNode->pbyName, MAX_LOADSTRING, FindFileData.cFileName);
-                _tcscpy_s(pNode->path, MAX_LOADSTRING, folderPath);
-                _tcscat_s(pNode->path, MAX_LOADSTRING, TEXT("\\"));
-                _tcscat_s(pNode->path, MAX_LOADSTRING, FindFileData.cFileName);
-                AddNode2Tree(pTree, pNode);
+                if ((0 == _tcscmp(TEXT(".doc"), PathFindExtension(FindFileData.cFileName))) ||
+                    (0 == _tcscmp(TEXT(".docx"), PathFindExtension(FindFileData.cFileName))))
+                {
+                    tNode *pNode = GetNewNode();
+                    pNode->dwLevel = level;
+                    pNode->dwAttr = FindFileData.dwFileAttributes;
+                    _tcscpy_s(pNode->pbyName, MAX_LOADSTRING, FindFileData.cFileName);
+                    _tcscpy_s(pNode->path, MAX_LOADSTRING, folderPath);
+                    _tcscat_s(pNode->path, MAX_LOADSTRING, TEXT("\\"));
+                    _tcscat_s(pNode->path, MAX_LOADSTRING, FindFileData.cFileName);
+                    AddNode2Tree(pTree, pNode);
+                }
             }
         }
     }
@@ -406,4 +504,46 @@ void FindFiles(TCHAR *folderPath, DWORD level)
     }
     return;
 }
+
+BOOL AddItemToList(HWND hWndListView, int index)
+{
+    LVITEM lvI;
+    TCHAR str[100] = {0};
+    lvI.mask = LVIF_TEXT | LVIF_PARAM;
+    lvI.lParam = 111;
+    lvI.iSubItem = 0;
+    lvI.iItem = index;
+    _stprintf_s(str, 100, TEXT("%03d"), index);
+    _tcscat_s(str, 100, TEXT("-哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈哈"));
+    lvI.pszText = str;
+    lvI.cchTextMax = 100;
+
+    if (ListView_InsertItem(hWndListView, &lvI) == -1)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL AddColumnToList(HWND hWndListView, int index)
+{
+    LVCOLUMN lvc;
+    TCHAR str[100] = TEXT("逗你玩儿");
+
+    lvc.mask = LVCF_FMT | LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM;
+    lvc.iSubItem = 0;
+    lvc.pszText = str;
+    lvc.cx = 400;
+    lvc.cchTextMax = 100;
+    lvc.fmt = LVCFMT_LEFT;
+
+    if (ListView_InsertColumn(hWndListView, index, &lvc) == -1)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 

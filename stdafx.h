@@ -19,5 +19,7 @@
 #include <CommCtrl.h>
 #include <stdio.h>
 #include <malloc.h>
+#include <Shlwapi.h>
+#pragma comment(lib,"Shlwapi.lib")
 
 // TODO:  在此处引用程序需要的其他头文件
